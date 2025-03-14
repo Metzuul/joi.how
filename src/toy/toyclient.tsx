@@ -3,9 +3,11 @@ import {
   type ButtplugClientDevice,
   ActuatorType,
 } from 'buttplug';
-import { ToyActuator, VibrationActuator } from './toyactuator';
+import { ToyActuator } from './toyactuator';
 import { Stroke } from '../game/GameProvider';
 import { wait, createStateProvider } from '../utils';
+import { PositionActuator } from './actuators/positionactuator';
+import { VibrationActuator } from './actuators/vibrationactuator';
 
 export class ToyClient {
   actuators: ToyActuator[] = [];
@@ -15,9 +17,8 @@ export class ToyClient {
       attribute =>
         (this.actuators = [...this.actuators, new VibrationActuator(attribute)])
     );
-    device.linearAttributes.forEach(
-      attribute =>
-        (this.actuators = [...this.actuators, new ToyActuator(attribute)])
+    device.linearAttributes.forEach(attribute => 
+      (this.actuators = [...this.actuators, new PositionActuator(attribute)])
     );
     device.oscillateAttributes.forEach(
       attribute =>
@@ -31,21 +32,28 @@ export class ToyClient {
 
   async actuate(stroke: Stroke, intensity: number, pace: number) {
     const vibrationArray: number[] = [];
+    let positionalOutput: any = null
     this.actuators.forEach(actuator => {
       switch (actuator.actuatorType) {
         case ActuatorType.Vibrate:
           vibrationArray[actuator.index] = actuator.getOutput?.(
-            stroke,
-            intensity,
-            pace
+           stroke,
+           intensity,
+           pace
           ) as number;
+          break;
+        case ActuatorType.Position:
+          positionalOutput = actuator.getOutput?.(stroke, intensity, pace);
           break;
         default:
           break;
       }
     });
     if (vibrationArray.length > 0) {
-      this.device.vibrate(vibrationArray);
+      await this.device.vibrate(vibrationArray);
+    }
+    if (positionalOutput) {
+      await this.device.linear(positionalOutput.position, positionalOutput.duration);
     }
   }
 
